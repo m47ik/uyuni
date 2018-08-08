@@ -1,3 +1,4 @@
+- Optimize execution of actions in minions (bsc#1099857)
 - XMLRPC API for state channels
 - add logic for RedHat modules
 - fix deletion of Taskomatic schedules via the GUI (bsc#1095569)
