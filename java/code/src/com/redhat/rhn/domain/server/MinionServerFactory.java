@@ -14,9 +14,12 @@
  */
 package com.redhat.rhn.domain.server;
 
+import static java.util.stream.Collectors.toList;
+
 import com.redhat.rhn.common.hibernate.HibernateFactory;
 import com.redhat.rhn.domain.action.server.ServerAction;
 import com.redhat.rhn.domain.user.User;
+
 import org.apache.log4j.Logger;
 import org.hibernate.Criteria;
 import org.hibernate.Session;
@@ -27,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -43,7 +47,7 @@ public class MinionServerFactory extends HibernateFactory {
      * @return the Server found
      */
     public static List<MinionServer> lookupByOrg(Long orgId) {
-        return (List<MinionServer>) HibernateFactory.getSession()
+        return HibernateFactory.getSession()
                 .createCriteria(MinionServer.class)
                 .setResultTransformer(Criteria.DISTINCT_ROOT_ENTITY)
                 .add(Restrictions.eq("org.id", orgId))
@@ -125,7 +129,7 @@ public class MinionServerFactory extends HibernateFactory {
      * @return the minion found
      */
     public static Optional<MinionServer> lookupById(Long id) {
-        return Optional.ofNullable((MinionServer) getSession().get(MinionServer.class, id));
+        return Optional.ofNullable(getSession().get(MinionServer.class, id));
     }
 
     /**
@@ -181,5 +185,59 @@ public class MinionServerFactory extends HibernateFactory {
                 .getNamedQuery("Action.findTradClientServerActions")
                 .setParameter("id", actionId)
                 .getResultList();
+    }
+
+    /**
+     * Find all Ids of the regular minions involved in one Action.
+     *
+     * @param actionId the Action id
+     * @return a list of regular minions ids involved in the given Action
+     */
+    public static List<MinionIds> findRegularMinionIds(Long actionId) {
+        return findMinionIds(actionId, false);
+    }
+
+    /**
+     * Find all Ids of the SSH-PUSH minions involved in one Action.
+     *
+     * @param actionId the Action id
+     * @return a list of SSH-PUSH minions ids involved in the given Action
+     */
+    public static List<MinionIds> findSSHPushMinionIds(Long actionId) {
+        return findMinionIds(actionId, true);
+    }
+
+    /**
+     * Find all Ids of the minions involved in one Action.
+     *
+     * @param actionId the Action id
+     * @param isSshPush whether to look for ssh-push minions
+     * @return a list minions ids involved in the given Action
+     */
+    @SuppressWarnings("unchecked")
+    private static List<MinionIds> findMinionIds(Long actionId, boolean isSshPush) {
+        String queryName = "Action.findRegularMinionIds";
+
+        if (isSshPush) {
+            queryName = "Action.findSSHPushMinionIds";
+        }
+        return ((List<Object[]>) HibernateFactory.getSession()
+                .getNamedQuery(queryName)
+                .setParameter("id", actionId)
+                .getResultList()).stream()
+                .map(row -> new MinionIds((Long)row[0], row[1].toString(), row[2].toString(), row[3].toString()))
+                .collect(toList());
+    }
+
+    /**
+     * Find all SSH-PUSH minions involved in one Action.
+     *
+     * @param actionId the Action id
+     * @return a list of ssh-push minions ids involved in the given Action
+     */
+    public static List<MinionServer> findSSHPushMinions(Long actionId) {
+        List<MinionIds> minionIdsList = findSSHPushMinionIds(actionId);
+        Set<String> minionIds = minionIdsList.stream().map(MinionIds::getMinionId).collect(Collectors.toSet());
+        return lookupByMinionIds(minionIds);
     }
 }

@@ -27,6 +27,7 @@ import com.redhat.rhn.domain.org.Org;
 import com.redhat.rhn.domain.org.OrgFactory;
 import com.redhat.rhn.domain.rhnpackage.PackageArch;
 import com.redhat.rhn.domain.rhnpackage.PackageEvr;
+import com.redhat.rhn.domain.server.MinionIds;
 import com.redhat.rhn.domain.server.MinionServer;
 import com.redhat.rhn.domain.server.MinionServerFactory;
 import com.redhat.rhn.domain.server.ServerGroup;
@@ -609,7 +610,7 @@ public class StatesAPI {
                     SaltConstants.SUMA_STATE_FILES_ROOT_PATH, SALT_PACKAGE_FILES);
             Files.createDirectories(baseDir);
             Path filePath = baseDir.resolve(
-                    getPackagesSlsName(server));
+                    getPackagesSlsName(new MinionIds(server)));
             SaltStateGenerator saltStateGenerator =
                     new SaltStateGenerator(filePath.toFile());
             saltStateGenerator.generate(new SaltInclude(ApplyStatesEventMessage.CHANNELS),
@@ -625,7 +626,7 @@ public class StatesAPI {
      * @param server the minion server
      * @return the name of the package sls file
      */
-    public static String getPackagesSlsName(MinionServer server) {
+    public static String getPackagesSlsName(MinionIds server) {
         return "packages_" + server.getDigitalServerId() + ".sls";
     }
 

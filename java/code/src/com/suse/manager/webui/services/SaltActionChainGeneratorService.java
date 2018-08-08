@@ -24,6 +24,7 @@ import static com.suse.manager.webui.services.impl.SaltSSHService.ACTION_STATES_
 import static com.suse.manager.webui.services.impl.SaltSSHService.DEFAULT_TOPS;
 
 import com.redhat.rhn.domain.action.ActionChain;
+import com.redhat.rhn.domain.server.MinionIds;
 import com.redhat.rhn.domain.server.MinionServer;
 import com.redhat.rhn.domain.server.MinionServerFactory;
 
@@ -107,14 +108,15 @@ public class SaltActionChainGeneratorService {
     /**
      * Get the number of chunks for each minion.
      * @param minionStates the states for each minion
+     * @param isSshPush whether the minions are SSH-Push minions
      * @return a map with the number of chunks for each minion
      */
-    public Map<MinionServer, Integer> getChunksPerMinion(Map<MinionServer, List<SaltState>> minionStates) {
+    public Map<MinionIds, Integer> getChunksPerMinion(Map<MinionIds, List<SaltState>> minionStates, boolean isSshPush) {
         return minionStates.entrySet().stream().collect(
                         Collectors.toMap(
                                 entry -> entry.getKey(),
                                 entry -> entry.getValue().stream()
-                                        .mapToInt(state -> mustSplit(state, entry.getKey()) ? 1 : 0).sum() + 1));
+                                        .mapToInt(state -> mustSplit(state, isSshPush) ? 1 : 0).sum() + 1));
     }
 
     /**
@@ -126,7 +128,7 @@ public class SaltActionChainGeneratorService {
      *                         be stored on the minion to be available for subsequent calls.
      * @return map containing minions and the corresponding number of generated chunks
      */
-    public Map<MinionServer, Integer> createActionChainSLSFiles(ActionChain actionChain, MinionServer minion,
+    public Map<MinionIds, Integer> createActionChainSLSFiles(ActionChain actionChain, MinionIds minion,
                                                                 List<SaltState> states,
                                                                 Optional<String> sshExtraFileRefs) {
         int chunk = 1;
@@ -145,7 +147,7 @@ public class SaltActionChainGeneratorService {
             }
             Optional<Long> nextActionId = nextActionId(states, i);
 
-            if (mustSplit(state, minion)) {
+            if (mustSplit(state, sshExtraFileRefs.isPresent())) {
                 if (isSaltUpgrade(state)) {
                     fileStates.add(
                             endChunk(actionChain, chunk, nextActionId,
@@ -309,7 +311,7 @@ public class SaltActionChainGeneratorService {
         return false;
     }
 
-    private boolean mustSplit(SaltState state, MinionServer minion) {
+    private boolean mustSplit(SaltState state, boolean isSshPush) {
         boolean split = false;
         if (state instanceof SaltModuleRun) {
             SaltModuleRun moduleRun = (SaltModuleRun)state;
@@ -318,7 +320,7 @@ public class SaltActionChainGeneratorService {
 
             if (mods.isPresent() &&
                     mods.get().contains(PACKAGES_PKGINSTALL) && isSaltUpgrade(state) &&
-                    !MinionServerUtils.isSshPushMinion(minion)) {
+                    !isSshPush) {
                 // split only for regular minions, salt-ssh minions don't have a salt-minion process
                 split = true;
             }
@@ -364,7 +366,7 @@ public class SaltActionChainGeneratorService {
         MinionServerFactory.findByMinionId(minionId).ifPresent(minionServer -> {
             Path targetDir = getTargetDir();
             Path targetFilePath = Paths.get(targetDir.toString(),
-                    getActionChainSLSFileName(actionChainId, minionServer, chunk));
+                    getActionChainSLSFileName(actionChainId, new MinionIds(minionServer), chunk));
             // Add specified SLS chunk file to remove list
             deleteSlsAndRefs(targetDir, targetFilePath);
 
@@ -479,12 +481,12 @@ public class SaltActionChainGeneratorService {
      * @param chunk a chunk number
      * @return the file name
      */
-    public static String getActionChainSLSFileName(Long actionChainId, MinionServer minionServer, int chunk) {
+    public static String getActionChainSLSFileName(Long actionChainId, MinionIds minionServer, int chunk) {
         return (ACTIONCHAIN_SLS_FILE_PREFIX + Long.toString(actionChainId) +
                 "_" + minionServer.getMachineId() + "_" + Integer.toString(chunk) + ".sls");
     }
 
-    private void saveChunkSLS(List<SaltState> states, MinionServer minion, long actionChainId, int chunk) {
+    private void saveChunkSLS(List<SaltState> states, MinionIds minion, long actionChainId, int chunk) {
         Path targetDir = createActionChainsDir();
         Path targetFilePath = Paths.get(targetDir.toString(),
                 getActionChainSLSFileName(actionChainId, minion, chunk));
