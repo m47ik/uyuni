@@ -97,7 +97,6 @@ import com.suse.manager.webui.utils.SaltSystemReboot;
 import com.suse.manager.webui.utils.TokenBuilder;
 import com.suse.manager.webui.utils.salt.MgrActionChains;
 import com.suse.manager.webui.utils.salt.State;
-import com.suse.manager.webui.utils.salt.custom.Openscap;
 import com.suse.manager.webui.utils.salt.custom.ScheduleMetadata;
 import com.suse.salt.netapi.calls.LocalCall;
 import com.suse.salt.netapi.calls.modules.State.ApplyResult;
